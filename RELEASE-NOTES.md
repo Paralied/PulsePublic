@@ -1,12 +1,9 @@
-Pulse 2.1.1 fixes game search.
+Pulse 2.2 cleans up the layout and adds Friends.
 
-- Place IDs and Roblox game links now use a direct lookup instead of text search.
-- A direct lookup preserves the exact place ID, including places inside an experience.
-- Saved-name matches and exact title matches are prioritized without case sensitivity.
-- Saved matches can still appear if online search fails.
-- Missing game metadata shows the entered place ID, so you can still try Play.
-- Results from an older query are discarded if you change the search field.
+- Games combines Library and Servers with one shared search field and roomy views.
+- Server rows show players and open slots instead of technical IDs.
+- Friends loads a saved Roblox username or user ID, with name filtering and available presence status.
+- Select a friend and click Join to hand off to the signed-in Roblox client; View profile opens their profile.
+- Status refreshes while Friends is open. Roblox checks join permissions and availability.
 
-Roblox's name search can omit experiences. Use the game's link or place ID when a name is not returned.
-
-Windows x64. Source stays private. Public releases and in-app update checks require no personal-token setup.
+Enter your Roblox username once under Friends. No password or cookie is needed. Public status may be hidden, and joins still depend on Roblox permissions and game availability.
