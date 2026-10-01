@@ -44,7 +44,9 @@ jobs:
           if gh release view "$tag" >/dev/null 2>&1; then
             draft=$(gh release view "$tag" --json isDraft --jq .isDraft)
             if [ "$draft" != true ]; then
-              digest=$(gh api "repos/$GH_REPO/releases/tags/$tag" --jq '.assets[] | select(.name == "Pulse.exe") | .digest')
+              release_id=$(gh api "repos/$GH_REPO/releases" --jq ".[] | select(.tag_name == \"$tag\") | .id")
+          test -n "$release_id"
+          digest=$(gh api "repos/$GH_REPO/releases/$release_id" --jq '.assets[] | select(.name == "Pulse.exe") | .digest')
               test "$digest" = "sha256:$CHECKSUM" || { echo 'Published version differs; increment VERSION.'; exit 1; }
               echo 'This version is already published and verified.'
               exit 0
@@ -53,6 +55,8 @@ jobs:
             gh release create "$tag" --draft --target "$GITHUB_SHA" --title "Pulse $VERSION" --notes-file RELEASE-NOTES.md
           fi
           gh release upload "$tag" Pulse.exe Pulse.exe.sha256 --clobber
-          digest=$(gh api "repos/$GH_REPO/releases/tags/$tag" --jq '.assets[] | select(.name == "Pulse.exe") | .digest')
+          release_id=$(gh api "repos/$GH_REPO/releases" --jq ".[] | select(.tag_name == \"$tag\") | .id")
+          test -n "$release_id"
+          digest=$(gh api "repos/$GH_REPO/releases/$release_id" --jq '.assets[] | select(.name == "Pulse.exe") | .digest')
           test "$digest" = "sha256:$CHECKSUM"
           gh release edit "$tag" --draft=false --latest
