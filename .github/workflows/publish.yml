@@ -1,0 +1,58 @@
+name: Publish Pulse
+on:
+  push:
+    branches: [main]
+    paths: ['dist/**', '.github/workflows/publish.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: pulse-release
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Verify release package
+        id: verify
+        shell: python
+        run: |
+          import gzip, hashlib, json, os, pathlib, re
+          manifest = json.loads(pathlib.Path('dist/release.json').read_text())
+          version = manifest['version']
+          assert re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', version)
+          assert re.fullmatch(r'[a-f0-9]{64}', manifest['sha256'])
+          data = gzip.decompress(pathlib.Path('dist/Pulse.exe.gz').read_bytes())
+          assert 1024 <= len(data) == manifest['size'] <= 52428800
+          assert data[:2] == b'MZ'
+          assert hashlib.sha256(data).hexdigest() == manifest['sha256']
+          pathlib.Path('Pulse.exe').write_bytes(data)
+          pathlib.Path('Pulse.exe.sha256').write_text(manifest['sha256'] + '  Pulse.exe\n')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f'version={version}\nsha256={manifest["sha256"]}\n')
+      - name: Publish verified release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ steps.verify.outputs.version }}
+          CHECKSUM: ${{ steps.verify.outputs.sha256 }}
+        run: |
+          set -euo pipefail
+          tag="v$VERSION"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            draft=$(gh release view "$tag" --json isDraft --jq .isDraft)
+            if [ "$draft" != true ]; then
+              digest=$(gh api "repos/$GH_REPO/releases/tags/$tag" --jq '.assets[] | select(.name == "Pulse.exe") | .digest')
+              test "$digest" = "sha256:$CHECKSUM" || { echo 'Published version differs; increment VERSION.'; exit 1; }
+              echo 'This version is already published and verified.'
+              exit 0
+            fi
+          else
+            gh release create "$tag" --draft --target "$GITHUB_SHA" --title "Pulse $VERSION" --notes-file RELEASE-NOTES.md
+          fi
+          gh release upload "$tag" Pulse.exe Pulse.exe.sha256 --clobber
+          digest=$(gh api "repos/$GH_REPO/releases/tags/$tag" --jq '.assets[] | select(.name == "Pulse.exe") | .digest')
+          test "$digest" = "sha256:$CHECKSUM"
+          gh release edit "$tag" --draft=false --latest
